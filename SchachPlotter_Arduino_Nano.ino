@@ -76,11 +76,13 @@ float VerteilerKoeff_Y; //für Motorsteuerung
 #define MAGNET             9
 #define SERVO              11
 
-//float beschleunigungsArray[rampenLaenge];
-//float bremsArray[rampenLaenge];
+int beschleunigenParabel[rampenLaenge];
+int bremsenParabel[rampenLaenge];
 
-int bremsen[rampenLaenge];
-int beschleunigen[rampenLaenge];
+/*
+int bremsenSinus[rampenLaenge];
+int beschleunigenSinus[rampenLaenge];
+*/
 
 //---------------------------------------------------------------------------
 float StepsProMM = 40.0;//1600 Steps/Umdrehung 40 Steps/mm (1/8 Schrittmodus)
@@ -110,45 +112,72 @@ void setup() {
 	
 	digitalWrite(MOTORS_ENABLED, HIGH); //Motoren unter Spannung
 	
-	//rampenKoeffizient = (minSpeed - maxSpeed) / rampenLaenge;
-	//gradKoeffizient = 90.0 / rampenLaenge;
 	
-		//Sinus-Beschleunigungs- und Bremsrampe
-   // float x;
-   // int   y;
-	// int zaehler = 0;
-	//for(float i = 270; i > 90; i = i - gradKoeffizient){	
-	// for(float i = 270; i > 180; i = i - gradKoeffizient){  
-		// yield(); // Do (almost) nothing --
-		// x = (sin(i*PI/180) * 100);
-		// y = int (minSpeed - (minSpeed / 100 * x))/ 2 + maxSpeed;	
-		// Serial.println(y);
-		// beschleunigungsArray[zaehler] = y;  
-		// zaehler++;			
-	// }
-	//zaehler = 0;
+	
+/*	
+	//Mein mühsam erarbeiteter Algorithmus mit Hammer, Nagel und Kneifzange...
+	rampenKoeffizient = (minSpeed - maxSpeed) / rampenLaenge;
+	gradKoeffizient = 90.0 / rampenLaenge;
+	
+	//Sinus-Beschleunigungs- und Bremsrampe
+   float x;
+   int   y;
+	int zaehler = 0;
+	for(float i = 270; i > 90; i = i - gradKoeffizient){	
+	for(float i = 270; i > 180; i = i - gradKoeffizient){  
+		yield(); // Do (almost) nothing --
+		x = (sin(i*PI/180) * 100);
+		y = int (minSpeed - (minSpeed / 100 * x))/ 2 + maxSpeed;	
+		Serial.println(y);
+		beschleunigungsArray[zaehler] = y;  
+		zaehler++;			
+	}
+	zaehler = 0;
 	//Sinus-Bremsrampe
-	//zaehler = 0;
-	//for(float i = 90; i < 270; i = i + gradKoeffizient){	
-	// for(float i = 90; i < 180; i = i + gradKoeffizient){ 	
-		// yield(); // Do (almost) nothing --  		
-		// x = (sin(i*PI/180)  * 100);
-		// y = int (minSpeed - (minSpeed / 100 * x))/ 2 + maxSpeed;	
-		// bremsArray[zaehler] = y;			
-		// zaehler++;
-	// }
-	// zaehler = 0;
-
-//Elegante, schlanke Rampenberechnung...
-//Danke miq19 vom Arduino Forum!	
+	zaehler = 0;
+	for(float i = 90; i < 270; i = i + gradKoeffizient){	
+	for(float i = 90; i < 180; i = i + gradKoeffizient){ 	
+		yield(); // Do (almost) nothing --  		
+		x = (sin(i*PI/180)  * 100);
+		y = int (minSpeed - (minSpeed / 100 * x))/ 2 + maxSpeed;	
+		bremsArray[zaehler] = y;			
+		zaehler++;
+	}
+	zaehler = 0;
+*/	
+	
+	
+	
+	
+/*
+	//Elegante, schlanke Sinus-Rampenberechnung...
+	//Danke miq19 vom Arduino Forum!	
 	for (unsigned int i = 0; i < rampenLaenge; ++i) 
 	{
 	  float wert = maxGeschwindigkeit + spanne * sin(winkel);
-	  //Serial.println(wert);
-	  // yield(); // Do (almost) nothing - für ESP D1 mini
-	  bremsen[i] = wert;
-	  beschleunigen[rampenLaenge - i - 1] = wert;
+	  yield(); // Do (almost) nothing - für ESP D1 mini
+	  bremsenSinus[i] = wert;
+	  beschleunigenSinus[rampenLaenge - i - 1] = wert;
 	  winkel += schrittweite;
+	}
+*/	
+	
+	
+	//BEGIN Parabel-Berechnung--------------------
+	rampenKoeffizient = 1.0 / rampenLaenge;
+	float multiplikator = 1.0;
+	
+	for (unsigned int i = 0; i < rampenLaenge; ++i) 
+	{
+		double wert = pow((rampenKoeffizient * multiplikator),2);
+		//double wert = (rampenKoeffizient * multiplikator) * (rampenKoeffizient * multiplikator);
+		//double wert = rampenKoeffizient * multiplikator * rampenKoeffizient * multiplikator;
+		wert = minSpeed - (spanne * wert);
+		int wert2 = int(wert);
+		beschleunigenParabel[i] = wert2;
+		bremsenParabel[rampenLaenge -i -1] = wert2;		
+		multiplikator ++;
+		
 	}
 	
 Serial.begin(115200);
@@ -213,9 +242,16 @@ void loop()
 			break;
 
 			case 13:
-				MapBerechnung(byte(values[1])); 
+				MapBerechnung(int(values[1])); 
 			break;
 			
+			case 14:
+				TestTextbox();
+			break;
+			
+			case 15:
+				Kaufmann(float(values[1]));
+			break;
 		}//END switch
 	}//END if (Serial.available())
 
@@ -309,8 +345,10 @@ int stepCount;
 // DEBUG_PRINTLN_TXT_VAL("sollPosition_Y ", YSteps);
 // DEBUG_PRINTLN;
 
-
 // Richtung bestimmen, abhängig von IstPosition
+//Ich weiß: die abs()-Funktion muss hier natürlich her.
+//stepsToGo_X = abs(sollPosition_X - istPosition_X);
+//Ich lasse es jetzt aber so...
 	//--------------------------------------------
    if (sollPosition_X > istPosition_X){
 		StepperX_DIR_PLUS();
@@ -383,7 +421,8 @@ int stepCount;
 		
 		if (stepCount <= rampenLaenge)
 		{
-			actualSpeed = beschleunigen[stepCount];
+			actualSpeed = beschleunigenParabel[stepCount]; //für Parabel
+			//actualSpeed = beschleunigenSinus[stepCount]; //für Sinus 
 			//actualSpeed = maxSpeed;
 		}
 		if (stepCount > rampenLaenge && stepCount < (SummeXYZ - rampenLaenge))
@@ -401,7 +440,8 @@ int stepCount;
 		}
 		if (stepCount >= (SummeXYZ - rampenLaenge))
 		{
-			actualSpeed = bremsen[wegZaehler];
+			actualSpeed = bremsenParabel[wegZaehler];  //für Parabel
+			//actualSpeed = bremsenSinus[wegZaehler];  //für Sinus
 			wegZaehler++;
 			//actualSpeed = maxSpeed;
 		}
@@ -425,6 +465,7 @@ int stepCount;
 		}
 		//-----------------------------------------	
 	}//END for( stepCount = 0; stepCount <= SummeXYZ; stepCount++)
+		
 // DEBUG_PRINTLN_TXT_VAL("counter_X = ", counter_X);	
 // DEBUG_PRINTLN_TXT_VAL("counter_Y = ", counter_Y);	
 // DEBUG_PRINTLN_TXT("#################################");
@@ -435,7 +476,7 @@ int stepCount;
 	counter_Y = 0;
 //***********************************************
 	digitalWrite(MOTORS_ENABLED,HIGH); //Treiber aktiv (HIGH = inaktiv)	   
-	Serial.println("ok 1: FahrtXY"); 
+	Serial.println("ok"); 
 }//-------- END FahrtXYZ(int XSteps, int YSteps) --------------------
 
 // ---------------------- BEGIN Stepper-Prozeduren ------------------
@@ -551,7 +592,7 @@ void ServoMove(int pos)
   delay(8);            
 }
 //------
-void Schachzug_1(int Buchstabe, int Zahl)   //Case 10:
+void Schachzug_1(int Buchstabe, int Zahl)                     //Case 10:
 {	//Eingabe ASCII-Werte: z.B. 'a1' -> 'a'=97, '1'=49
 	//Dann Umrechnung der ASCII-Werte in die Koordinaten des Schachbretts
 	char myBuchChar = Buchstabe;
@@ -619,7 +660,7 @@ void Schlagzug(int X_Begin, int Y_Begin, int X_End, int Y_End)     //Case 12:
 	Serial.println("ok 12: Schlagzug");
 }//- END Schlagzug_2(int X_Begin, int Y_Begin, int X_End, int Y_End)-
 //------
-void MapBerechnung(byte Fig_Adress) 										//case 13:
+void MapBerechnung(byte Fig_Adress) 						             //case 13:
 {
 	byte EinerStelle;
 	byte ZehnerStelle;
@@ -731,5 +772,22 @@ void MapBerechnung(byte Fig_Adress) 										//case 13:
 		Serial.print(" X_Begin "); Serial.println(X_Begin);
 
 	}
-//---------------------------------------------------------			
-}//---------- END void MapBerechnung(byte Fig_Adress) -----
+}
+//---------- END void MapBerechnung(byte Fig_Adress) ------
+
+void TestTextbox()										                   //case 14:
+{	
+	Serial.println("Zeile1");
+	Serial.println("Zeile2");
+	Serial.println("Zeile3");
+	Serial.println("Zeile4");
+}
+//---------------------------------------------------------
+void Kaufmann(float dezimalZahl)                                    //case 15:
+{	
+	int gerundeteZahl = runden(dezimalZahl);
+	Serial.print("Dezimalzahl    = "); Serial.println(dezimalZahl);
+	Serial.print("gerundete Zahl = "); Serial.println(gerundeteZahl);
+	Serial.println();	
+}
+//---------------------------------------------------------
