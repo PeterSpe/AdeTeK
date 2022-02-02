@@ -79,7 +79,12 @@ namespace AdeTeK_Plottertest
             //timer1.Start();
             panel1.Enabled = true;
             btnConnect.Enabled = false;
-            btnDisconnect.Enabled = true;       
+            btnDisconnect.Enabled = true;
+            serialPort1.Write("6,0,0,0,0"); //ServoDown case 6:
+            Sleep(2000);
+            serialPort1.Write("5,0,0,0,0"); //ServoUp   case 5:
+            txbServoUpdatelAngleMin.Text = "10";
+            txbServoUpdatelAngleMax.Text = "170";
         }          
         //-----------------------------------------------------------
         private void timer1_Tick(object sender, EventArgs e)
@@ -263,11 +268,11 @@ namespace AdeTeK_Plottertest
         {
             int Pausenzeit = 5000;
             tbxTest3.Text = "Pause: "+ Pausenzeit.ToString();
-            serialPort1.Write("1,9000,8300,0,0");
+            serialPort1.Write("1,600,700,0,0");
             Sleep(Pausenzeit);
             serialPort1.Write("1,0,0,0,0");
             Sleep(Pausenzeit);
-            serialPort1.Write("1,5000,7900,0,0");
+            serialPort1.Write("1,400,350,0,0");
             Sleep(Pausenzeit);
             serialPort1.Write("1,0,0,0,0");
         }
@@ -284,23 +289,60 @@ namespace AdeTeK_Plottertest
         {
             return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow;
         }//END private static int map()------------------------------
+
+        private void btnReadCurrentAngles_Click(object sender, EventArgs e)
+        {
+            tbReceived.Clear();                      //ServoReadAngles()   case 16:
+            serialPort1.Write("16,0,0,0,0");
+            Sleep(1500);
+            var Zeile = this.tbReceived.Lines;
+            try
+            {
+                this.txbServoActualAngleMin.Text = Zeile[0];
+                this.txbServoActualAngleMax.Text = Zeile[1];
+            }
+            catch //(Exception ex)
+            {
+                MsgBox("Es sind noch keine Werte vorhanden");
+            }
+            //Sleep(1000);
+            tbReceived.Clear();
+        }
+
+        private void btnWriteDefaultAngles_Click(object sender, EventArgs e)
+        {
+            serialPort1.Write("17,10,170,0,0");    //ServoUpdateAngles()   case 17:
+            txbServoUpdatelAngleMin.Text = "10";
+            txbServoUpdatelAngleMax.Text= "170";            
+        }
+
+        private void btnWriteUpdateAngles_Click(object sender, EventArgs e)
+        {
+            this.serialPort1.Write("17," + txbServoUpdatelAngleMin.Text + "," + txbServoUpdatelAngleMax.Text + ",0,0");
+        }
+
         //-----------------------------------------------------------
         private void btnWhileSchleife_Click(object sender, EventArgs e)
         {
-            FahrtXY(9000, 8300);
+            FahrtXY(1200, 1300);
             Sleep(sleepPause);
+            Sleep(1000); //zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
 
             FahrtXY(0, 0);
             Sleep(sleepPause);
+            Sleep(1000); //zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
 
-            FahrtXY(5000, 7900);
+            FahrtXY(1500, 600);
             Sleep(sleepPause);
+            Sleep(1000); //zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
 
             FahrtXY(0, 0);
             Sleep(sleepPause);
+            Sleep(1000); //zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
 
-            FahrtXY(1200, 300);
+            FahrtXY(2300, 1700);
             Sleep(sleepPause);
+            Sleep(2000); //zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
 
             FahrtXY(0, 0);
             Sleep(sleepPause);
@@ -308,6 +350,9 @@ namespace AdeTeK_Plottertest
         //-----------------------------------------------------------
         public void FahrtXY(int Steps_X, int Steps_Y)
         {
+            //die map-Funktion ist noch nicht ausgereift. Mehrere Motorläufe hintereinander
+            //funktionieren nicht immer...
+
             sollPosition_X = Steps_X;
             sollPosition_Y = Steps_Y;
             stepsToGo_X = Math.Abs(sollPosition_X - istPosition_X);
@@ -320,7 +365,11 @@ namespace AdeTeK_Plottertest
             //#######################################################
             istPosition_X = sollPosition_X;
             istPosition_Y = sollPosition_Y;
+
+            //map-Funktion ##########################################
             sleepPause = map(SummeSteps_XY, 500, 10000, 1000, 4500);
+            //#######################################################
+
             //tbxSleepPause.Text = sleepPause.ToString();
             tbxTest4.Text = "Pause: " + sleepPause.ToString();             
         }
