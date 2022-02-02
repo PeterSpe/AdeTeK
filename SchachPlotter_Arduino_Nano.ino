@@ -1,21 +1,8 @@
- /*
- 1.0,200.0,140.0,0.0,0.0
- 
- Normalzug
- d2->d4
- b1->c3
- 11.0, 120.0, 20.0, 120.0, 60.0
- 11.0, 80.0, 0.0, 100.0, 40.0
- 
- Schlagzug
- d2->d4
- b1->c3
- 12.0, 120.0, 20.0, 120.0, 60.0
- 12.0, 80.0, 0.0, 100.0, 40.0
- 
-#define DEBUG_ON .... Debugger ist aktiviert
+//https://arduino-projekte.webnode.at/arduino-debugger/
+//gute Alternative zum Serial.print
+
+//#define DEBUG_ON .... Debugger ist aktiviert
 //#define DEBUG_ON ... Debugger ist deaktiviert
-*/
 
 //#define DEBUG_ON //Debugger ist aktiviert (Definition muss vor der include-Anweisung stehen!)
 //#include <MyDebug.h>
@@ -34,6 +21,8 @@ int stepPause          = 8; 		 //Microseconds
 const int rampenLaenge = 150.0;	 //Steps
 float maxSpeed         = 150.0;	 //Microseconds Pause zwischen den Steps
 float minSpeed         = 2500.0;	 //Microseconds Pause zwischen den Steps
+							//Die Spanne ist hier: Bremsrampe 150µs --> 2500µs
+							          //Beschleunigungsrampe 2500µs --> 150µs
 int actualSpeed        = maxSpeed;//Microseconds Pause zwischen den Steps
 
 float maxGeschwindigkeit = maxSpeed;
@@ -53,11 +42,10 @@ int stepCount;          //für Motorsteuerung
 float VerteilerKoeff_X; //für Motorsteuerung
 float VerteilerKoeff_Y; //für Motorsteuerung
 
-// The X stepper pins - D1 mini ESP8266
+// D1 mini ESP8266
 // #define STEPPER_X_STEP_PIN 12 // D6
 // #define STEPPER_X_DIR_PIN  13 // D7
 
-// The Y stepper pins - D1 mini 8266
 // #define STEPPER_Y_STEP_PIN 16 // D0
 // #define STEPPER_Y_DIR_PIN  14 // D5
 
@@ -75,14 +63,15 @@ float VerteilerKoeff_Y; //für Motorsteuerung
 #define MOTORS_ENABLED     8
 #define MAGNET             9
 #define SERVO              11
-
+/*
 int beschleunigenParabel[rampenLaenge];
 int bremsenParabel[rampenLaenge];
+*/
 
-/*
+
 int bremsenSinus[rampenLaenge];
 int beschleunigenSinus[rampenLaenge];
-*/
+
 
 //---------------------------------------------------------------------------
 float StepsProMM = 40.0;//1600 Steps/Umdrehung 40 Steps/mm (1/8 Schrittmodus)
@@ -99,6 +88,8 @@ int Park_Y[] = {140, 120, 100, 80, 60, 40, 20, 0, 140, 120, 100, 80, 60, 40, 20,
 
 int Park_Index = 0; //Park_Index 0 bis 31
 byte Modulo;
+	int ServoWinkelMax = 170; //Servo Winkel Max
+	int ServoWinkelMin = 10;  //Servo Winkel Min
 //---------------------------------------------------------------------------
 void setup() {
 	pinMode(STEPPER_X_DIR_PIN, OUTPUT);
@@ -114,33 +105,31 @@ void setup() {
 	
 	
 	
-/*	
+/*
 	//Mein mühsam erarbeiteter Algorithmus mit Hammer, Nagel und Kneifzange...
 	rampenKoeffizient = (minSpeed - maxSpeed) / rampenLaenge;
-	gradKoeffizient = 90.0 / rampenLaenge;
+	gradKoeffizient = 180.0 / rampenLaenge;
 	
 	//Sinus-Beschleunigungs- und Bremsrampe
    float x;
    int   y;
 	int zaehler = 0;
-	for(float i = 270; i > 90; i = i - gradKoeffizient){	
-	for(float i = 270; i > 180; i = i - gradKoeffizient){  
+	for(float i = 270; i > 90; i = i - gradKoeffizient){	 
 		yield(); // Do (almost) nothing --
 		x = (sin(i*PI/180) * 100);
 		y = int (minSpeed - (minSpeed / 100 * x))/ 2 + maxSpeed;	
 		Serial.println(y);
-		beschleunigungsArray[zaehler] = y;  
+		beschleunigenSinus[zaehler] = y;  
 		zaehler++;			
 	}
 	zaehler = 0;
 	//Sinus-Bremsrampe
 	zaehler = 0;
-	for(float i = 90; i < 270; i = i + gradKoeffizient){	
-	for(float i = 90; i < 180; i = i + gradKoeffizient){ 	
+	for(float i = 90; i < 270; i = i + gradKoeffizient){		
 		yield(); // Do (almost) nothing --  		
 		x = (sin(i*PI/180)  * 100);
 		y = int (minSpeed - (minSpeed / 100 * x))/ 2 + maxSpeed;	
-		bremsArray[zaehler] = y;			
+		bremsenSinus[zaehler] = y;			
 		zaehler++;
 	}
 	zaehler = 0;
@@ -148,8 +137,7 @@ void setup() {
 	
 	
 	
-	
-/*
+
 	//Elegante, schlanke Sinus-Rampenberechnung...
 	//Danke miq19 vom Arduino Forum!	
 	for (unsigned int i = 0; i < rampenLaenge; ++i) 
@@ -160,11 +148,11 @@ void setup() {
 	  beschleunigenSinus[rampenLaenge - i - 1] = wert;
 	  winkel += schrittweite;
 	}
-*/	
 	
 	
+/*
 	//BEGIN Parabel-Berechnung--------------------
-	rampenKoeffizient = 1.0 / rampenLaenge;
+	rampenKoeffizient = 1.0 / rampenLaenge; //entweder 1.0 oder 2.0
 	float multiplikator = 1.0;
 	
 	for (unsigned int i = 0; i < rampenLaenge; ++i) 
@@ -179,15 +167,15 @@ void setup() {
 		multiplikator ++;
 		
 	}
-	
+*/	
 Serial.begin(115200);
 }
 //---------------------------------------------------------------------------
 void loop() 
 {
 	if (Serial.available() > 0) { //geändert. Vorher: if (Serial.available())
-		for (feldindex = 0; feldindex < ANZAHL_FELDER; feldindex++) {
-
+		for (feldindex = 0; feldindex < ANZAHL_FELDER; feldindex++) 
+		{
 			values[feldindex] = Serial.parseFloat();
 		}//-----END for (feldindex = 0
 		
@@ -251,6 +239,15 @@ void loop()
 			
 			case 15:
 				Kaufmann(float(values[1]));
+			break;
+			
+			case 16:
+				ServoPrintActualAngle();
+			break;
+			
+			case 17:
+				ServoUpdateAngles(int(values[1]), int(values[2])); 
+				//values[1] = MinAngle, values[2] = MaxAngle
 			break;
 		}//END switch
 	}//END if (Serial.available())
@@ -421,8 +418,8 @@ int stepCount;
 		
 		if (stepCount <= rampenLaenge)
 		{
-			actualSpeed = beschleunigenParabel[stepCount]; //für Parabel
-			//actualSpeed = beschleunigenSinus[stepCount]; //für Sinus 
+			//actualSpeed = beschleunigenParabel[stepCount]; //für Parabel
+			actualSpeed = beschleunigenSinus[stepCount]; //für Sinus 
 			//actualSpeed = maxSpeed;
 		}
 		if (stepCount > rampenLaenge && stepCount < (SummeXYZ - rampenLaenge))
@@ -440,8 +437,8 @@ int stepCount;
 		}
 		if (stepCount >= (SummeXYZ - rampenLaenge))
 		{
-			actualSpeed = bremsenParabel[wegZaehler];  //für Parabel
-			//actualSpeed = bremsenSinus[wegZaehler];  //für Sinus
+			//actualSpeed = bremsenParabel[wegZaehler];  //für Parabel
+			actualSpeed = bremsenSinus[wegZaehler];  //für Sinus
 			wegZaehler++;
 			//actualSpeed = maxSpeed;
 		}
@@ -530,8 +527,8 @@ void MagnetOFF()
 
 void ServoUP()                   // case 5:
 {
-	 for(int pos=10; pos<170; pos++) 
-	 { // Servo Up
+	 for(int pos = ServoWinkelMin; pos < ServoWinkelMax; pos++) 
+	 { // Servo Up, Grundeinstellung: ServoWinkelMin = 10, ServoWinkelMax = 170
       yield;
 		ServoMove(pos);
 	 }
@@ -540,8 +537,8 @@ void ServoUP()                   // case 5:
 //------
 void ServoDown()                 // case 6:
 {
-	for(int pos=170; pos>10; pos--) 
-	{ // Servo Down
+	for(int pos = ServoWinkelMax; pos > ServoWinkelMin; pos--) 
+	{ // Servo Down, Grundeinstellung: ServoWinkelMax = 170, ServoWinkelMin = 10
 		yield;
 		ServoMove(pos);
 	}
@@ -789,5 +786,17 @@ void Kaufmann(float dezimalZahl)                                    //case 15:
 	Serial.print("Dezimalzahl    = "); Serial.println(dezimalZahl);
 	Serial.print("gerundete Zahl = "); Serial.println(gerundeteZahl);
 	Serial.println();	
+}
+//---------------------------------------------------------
+void ServoPrintActualAngle()										            //case 16:
+{	
+	Serial.println(ServoWinkelMin);
+	Serial.println(ServoWinkelMax);
+}
+//---------------------------------------------------------
+void ServoUpdateAngles(int MinAgle, int MaxAngle)                     //case 17:
+{
+	ServoWinkelMin = MinAgle;
+	ServoWinkelMax = MaxAngle;	
 }
 //---------------------------------------------------------
