@@ -64,6 +64,11 @@ Namespace AdeTeK_Plottertest
             Me.panel1.Enabled = True
             Me.btnConnect.Enabled = False
             Me.btnDisconnect.Enabled = True
+            Me.serialPort1.Write("6,0,0,0,0") 'ServoDown case 6:
+            Sleep(2000)
+            Me.serialPort1.Write("5,0,0,0,0") 'ServoUp   case 5:
+            Me.txbServoUpdatelAngleMin.Text = "10"
+            Me.txbServoUpdatelAngleMax.Text = "170"
         End Sub
         '-----------------------------------------------------------
         Private Sub timer1_Tick(ByVal sender As Object, ByVal e As EventArgs)
@@ -216,11 +221,11 @@ Namespace AdeTeK_Plottertest
         Private Sub btnStaticTime_Click(ByVal sender As Object, ByVal e As EventArgs)
             Dim Pausenzeit = 5000
             Me.tbxTest3.Text = "Pause: " & Pausenzeit.ToString()
-            Me.serialPort1.Write("1,9000,8300,0,0")
+            Me.serialPort1.Write("1,600,700,0,0")
             Sleep(Pausenzeit)
             Me.serialPort1.Write("1,0,0,0,0")
             Sleep(Pausenzeit)
-            Me.serialPort1.Write("1,5000,7900,0,0")
+            Me.serialPort1.Write("1,400,350,0,0")
             Sleep(Pausenzeit)
             Me.serialPort1.Write("1,0,0,0,0")
         End Sub
@@ -235,23 +240,58 @@ Namespace AdeTeK_Plottertest
         Public Shared Function map(ByVal value As Integer, ByVal fromLow As Integer, ByVal fromHigh As Integer, ByVal toLow As Integer, ByVal toHigh As Integer) As Integer
             Return (value - fromLow) * (toHigh - toLow) / (fromHigh - fromLow) + toLow
         End Function 'END private static int map()------------------------------
+
+        Private Sub btnReadCurrentAngles_Click(ByVal sender As Object, ByVal e As EventArgs)
+            Me.tbReceived.Clear()                      'ServoReadAngles()   case 16:
+            Me.serialPort1.Write("16,0,0,0,0")
+            Sleep(1500)
+            Dim Zeile = Me.tbReceived.Lines
+
+            Try
+                Me.txbServoActualAngleMin.Text = Zeile(0)
+                Me.txbServoActualAngleMax.Text = Zeile(1) '(Exception ex)
+            Catch
+                MsgBox("Es sind noch keine Werte vorhanden")
+            End Try
+            'Sleep(1000);
+            Me.tbReceived.Clear()
+        End Sub
+
+        Private Sub btnWriteDefaultAngles_Click(ByVal sender As Object, ByVal e As EventArgs)
+            Me.serialPort1.Write("17,10,170,0,0")    'ServoUpdateAngles()   case 17:
+            Me.txbServoUpdatelAngleMin.Text = "10"
+            Me.txbServoUpdatelAngleMax.Text = "170"
+        End Sub
+
+        Private Sub btnWriteUpdateAngles_Click(ByVal sender As Object, ByVal e As EventArgs)
+            Me.serialPort1.Write("17," & Me.txbServoUpdatelAngleMin.Text & "," & Me.txbServoUpdatelAngleMax.Text & ",0,0")
+        End Sub
+
         '-----------------------------------------------------------
         Private Sub btnWhileSchleife_Click(ByVal sender As Object, ByVal e As EventArgs)
-            FahrtXY(9000, 8300)
+            FahrtXY(1200, 1300)
             Sleep(sleepPause)
+            Sleep(1000) 'zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
             FahrtXY(0, 0)
             Sleep(sleepPause)
-            FahrtXY(5000, 7900)
+            Sleep(1000) 'zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
+            FahrtXY(1500, 600)
             Sleep(sleepPause)
+            Sleep(1000) 'zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
             FahrtXY(0, 0)
             Sleep(sleepPause)
-            FahrtXY(1200, 300)
+            Sleep(1000) 'zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
+            FahrtXY(2300, 1700)
             Sleep(sleepPause)
+            Sleep(2000) 'zusätzliche Hilfe, map-Funktion funktioniert nicht immer in FahrtXY()
             FahrtXY(0, 0)
             Sleep(sleepPause)
         End Sub
         '-----------------------------------------------------------
         Public Sub FahrtXY(ByVal Steps_X As Integer, ByVal Steps_Y As Integer)
+            'die map-Funktion ist noch nicht ausgereift. Mehrere Motorläufe hintereinander
+            'funktionieren nicht immer...
+
             sollPosition_X = Steps_X
             sollPosition_Y = Steps_Y
             stepsToGo_X = Math.Abs(sollPosition_X - istPosition_X)
@@ -264,7 +304,11 @@ Namespace AdeTeK_Plottertest
             '#######################################################
             istPosition_X = sollPosition_X
             istPosition_Y = sollPosition_Y
+
+            'map-Funktion ##########################################
             sleepPause = map(SummeSteps_XY, 500, 10000, 1000, 4500)
+            '#######################################################
+
             'tbxSleepPause.Text = sleepPause.ToString();
             Me.tbxTest4.Text = "Pause: " & sleepPause.ToString()
         End Sub
