@@ -35,7 +35,7 @@ float winkel       = 0.0;
 float gradKoeffizient;  //für Sinus-Rampe (obsolet)
 float rampenKoeffizient;//(obsolet)
 int zaehler; 			   //für die Rampenberechnung
-int wegZaehler = 1; 	   //Für die Bremsrampe
+int wegZaehler; 	   	//Für die Bremsrampe
 //END Rampenberechnung Variablen -------
 
 int stepCount;          //für Motorsteuerung
@@ -101,7 +101,7 @@ void setup() {
 	pinMode(SERVO,             OUTPUT);	
 	pinMode(MAGNET,            OUTPUT);	
 	
-	digitalWrite(MOTORS_ENABLED, HIGH); //Motoren unter Spannung
+	digitalWrite(MOTORS_ENABLED, HIGH); //Motoren nicht unter Spannung
 	
 	
 	
@@ -319,33 +319,29 @@ void Reset()  //--------------- BEGIN Reset() -----------------------
 //###################################################################
 void FahrtXYZ(float XSteps, float YSteps) //Eingabe: Steps
 {
-float sollPosition_X;
-float sollPosition_Y;
 
-float stepsToGo_X = 0;
-float stepsToGo_Y = 0;
+float	sollPosition_X = XSteps;
+float	sollPosition_Y = YSteps;
 
-float SummeXYZ;
-int multiplikator_X = 1;
-int multiplikator_Y = 1;
+float stepsToGo_X = 0; //die aktuellen Schritte für den X-Motor nach Positionsberechnung
+float stepsToGo_Y = 0; //die aktuellen Schritte für den Y-Motor nach Positionsberechnung
 
-int counter_X = 0;
-int counter_Y = 0;
-int stepCount;
+float SummeXY;
+int multiplikator_X = 1; //für Verteilerkoeffizient X
+int multiplikator_Y = 1; //für Verteilerkoeffizient Y
+
+int counter_X  = 0; //Zählt die Steps des X-Motors
+int counter_Y  = 0; //Zählt die Steps des X-Motors
+int wegZaehler = 1; //Zähler für die Bremsrampe
+int stepCount;		  // Zähler für die Taktschleife
 
 	digitalWrite(MOTORS_ENABLED,LOW); //Treiber unter Spannung	
-	
-	sollPosition_X = XSteps;
-	sollPosition_Y = YSteps;
-			
+				
 // DEBUG_PRINTLN_TXT_VAL("sollPosition_X ", XSteps);
 // DEBUG_PRINTLN_TXT_VAL("sollPosition_Y ", YSteps);
 // DEBUG_PRINTLN;
 
-// Richtung bestimmen, abhängig von IstPosition
-//Ich weiß: die abs()-Funktion muss hier natürlich her.
-//stepsToGo_X = abs(sollPosition_X - istPosition_X);
-//Ich lasse es jetzt aber so...
+// Richtung der Motoren bestimmen, abhängig von IstPosition und SollPosition
 	//--------------------------------------------
    if (sollPosition_X > istPosition_X){
 		StepperX_DIR_PLUS();
@@ -374,7 +370,7 @@ int stepCount;
 	}
    //--------------------------------------------	
  
-	SummeXYZ = (stepsToGo_X + stepsToGo_Y);
+	SummeXY = (stepsToGo_X + stepsToGo_Y); //Die eigentlichen Steps, die zu fahren sind.
 	
 // DEBUG_PRINTLN_TXT_VAL("stepsToGo_X = ", stepsToGo_X);
 // DEBUG_PRINTLN_TXT_VAL("stepsToGo_Y = ", stepsToGo_Y);
@@ -387,7 +383,7 @@ int stepCount;
 	}
 	else
 	{
-		VerteilerKoeff_X = SummeXYZ / stepsToGo_X;	
+		VerteilerKoeff_X = SummeXY / stepsToGo_X;	
 	}
    //--------------------------------------------	
 	if(stepsToGo_Y == 0)
@@ -396,33 +392,34 @@ int stepCount;
 	}
 	else
 	{
-		VerteilerKoeff_Y = SummeXYZ / stepsToGo_Y;	
+		VerteilerKoeff_Y = SummeXY / stepsToGo_Y;	
 	}
    //--------------------------------------------
 
 // DEBUG_PRINTLN_TXT_VAL("VerteilerKoeff_X = ", VerteilerKoeff_X);	
 // DEBUG_PRINTLN_TXT_VAL("VerteilerKoeff_Y = ", VerteilerKoeff_Y);		
 
-	istPosition_X = sollPosition_X;
-	istPosition_Y = sollPosition_Y;
+	istPosition_X = sollPosition_X;//istPosition_X wird aktualisiert
+	istPosition_Y = sollPosition_Y;//istPosition_Y wird aktualisiert
 	//--------------------------------------------	
 	stepCount = 0;
 	multiplikator_X = 1;
 	multiplikator_Y = 1;
-   wegZaehler      = 1;
-	int IntSummeXYZ = int(SummeXYZ);
-	//********************************************	
-	for( stepCount = 0; stepCount <= IntSummeXYZ; stepCount++)
+	
+	
+	
+	//***************************************************************************	
+	for( stepCount = 0; stepCount <= SummeXY; stepCount++)
 	{ 
 		yield(); // Do (almost) nothing
 		
-		if (stepCount <= rampenLaenge)
+		if (stepCount <= rampenLaenge)     //Beginn der Beschleunigungsramperampe
 		{
 			//actualSpeed = beschleunigenParabel[stepCount]; //für Parabel
 			actualSpeed = beschleunigenSinus[stepCount]; //für Sinus 
 			//actualSpeed = maxSpeed;
 		}
-		if (stepCount > rampenLaenge && stepCount < (SummeXYZ - rampenLaenge))
+		if (stepCount > rampenLaenge && stepCount < (SummeXY - rampenLaenge))
 		{  
 			if (stepsToGo_X == 0 || stepsToGo_Y == 0) 
 			{
@@ -435,7 +432,7 @@ int stepCount;
 			}
 
 		}
-		if (stepCount >= (SummeXYZ - rampenLaenge))
+		if (stepCount >= (SummeXY - rampenLaenge))       //Beginn der Bremsrampe
 		{
 			//actualSpeed = bremsenParabel[wegZaehler];  //für Parabel
 			actualSpeed = bremsenSinus[wegZaehler];  //für Sinus
@@ -449,20 +446,23 @@ int stepCount;
 		//-----------------------------------------
 		if (stepCount == runden(VerteilerKoeff_X * multiplikator_X))
 		{		  
-			StepperX_run(actualSpeed); 
+			StepperX_run(actualSpeed);                     //X-Motor wird getaktet
 			multiplikator_X++;
 			counter_X++;
 		}
 		//-----------------------------------------
 		if (stepCount == runden(VerteilerKoeff_Y * multiplikator_Y))
 		{		  
-			StepperY_run(actualSpeed); 
+			StepperY_run(actualSpeed);                     //Y-Motor wird getaktet
 			multiplikator_Y++;
 			counter_Y++;			
 		}
 		//-----------------------------------------	
-	}//END for( stepCount = 0; stepCount <= SummeXYZ; stepCount++)
-		
+	}//END for( stepCount = 0; stepCount <= SummeXY; stepCount++)
+	//***************************************************************************
+
+
+
 // DEBUG_PRINTLN_TXT_VAL("counter_X = ", counter_X);	
 // DEBUG_PRINTLN_TXT_VAL("counter_Y = ", counter_Y);	
 // DEBUG_PRINTLN_TXT("#################################");
@@ -772,7 +772,7 @@ void MapBerechnung(byte Fig_Adress) 						             //case 13:
 }
 //---------- END void MapBerechnung(byte Fig_Adress) ------
 
-void TestTextbox()										                   //case 14:
+void TestTextbox()										                     //case 14:
 {	
 	Serial.println("Zeile1");
 	Serial.println("Zeile2");
@@ -780,7 +780,7 @@ void TestTextbox()										                   //case 14:
 	Serial.println("Zeile4");
 }
 //---------------------------------------------------------
-void Kaufmann(float dezimalZahl)                                    //case 15:
+void Kaufmann(float dezimalZahl)                                     //case 15:
 {	
 	int gerundeteZahl = runden(dezimalZahl);
 	Serial.print("Dezimalzahl    = "); Serial.println(dezimalZahl);
@@ -794,7 +794,7 @@ void ServoPrintActualAngle()										            //case 16:
 	Serial.println(ServoWinkelMax);
 }
 //---------------------------------------------------------
-void ServoUpdateAngles(int MinAgle, int MaxAngle)                     //case 17:
+void ServoUpdateAngles(int MinAgle, int MaxAngle)                    //case 17:
 {
 	ServoWinkelMin = MinAgle;
 	ServoWinkelMax = MaxAngle;	
