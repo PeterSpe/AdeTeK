@@ -62,7 +62,8 @@ float VerteilerKoeff_Y; //für Motorsteuerung
  
 #define MOTORS_ENABLED     8
 #define MAGNET             9
-#define SERVO              11
+#define SERVO              11
+
 /*
 int beschleunigenParabel[rampenLaenge];
 int bremsenParabel[rampenLaenge];
@@ -331,7 +332,7 @@ int multiplikator_X = 1; //für Verteilerkoeffizient X
 int multiplikator_Y = 1; //für Verteilerkoeffizient Y
 
 int counter_X  = 0; //Zählt die Steps des X-Motors
-int counter_Y  = 0; //Zählt die Steps des X-Motors
+int counter_Y  = 0; //Zählt die Steps des Y-Motors
 int wegZaehler = 1; //Zähler für die Bremsrampe
 int stepCount;		  // Zähler für die Taktschleife
 
